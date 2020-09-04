@@ -1,0 +1,25 @@
+{
+    "app": {
+        "token": "1312267022:AAHiwH7Ss4Ek5zIFFb66ygzyRnJwDcpeG-s"
+    },
+    "logger": {
+        "categories": {
+            "default": {
+                "appenders": [
+                    "all"
+                ],
+                "level": "trace"
+            }
+        },
+        "appenders": {
+            "all": {
+                "type": "file",
+                "maxLogSize": 52428800,
+                "filename": "/Users/armanoganesyan/Projects/rating-bot/logs/all.log",
+                "layout": {
+                    "type": "basic"
+                }
+            }
+        }
+    }
+}
