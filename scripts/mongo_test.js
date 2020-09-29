@@ -2,7 +2,10 @@ const mongodb = require('mongodb');
 
 module.exports.example = function () {
     return new Promise((resolve, reject) => {
-        mongodb.connect('mongodb+srv://arman:test12345@first-cluster.2xgep.mongodb.net/test?retryWrites=true&w=majority', (error, client) => {
+        mongodb.connect('mongodb+srv://arman:test12345@first-cluster.2xgep.mongodb.net/test?retryWrites=true&w=majority', {
+            useNewUrlParser: true,
+            useUnifiedTopology: true
+        }, (error, client) => {
             if (error) {
                 console.log('Connection to MongoDB failed!', error);
                 client.close();

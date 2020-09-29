@@ -21,5 +21,16 @@
                 }
             }
         }
+    },
+    "mongo": {
+        "url": "mongodb+srv://arman:test12345@cluster0.2xgep.mongodb.net/test?retryWrites=true&w=majority",
+        "options": {
+            "useUnifiedTopology": true
+        }
+    },
+    "tg": {
+        "polling": {
+            "autoStart": false
+        }
     }
 }
