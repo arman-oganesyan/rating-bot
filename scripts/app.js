@@ -34,6 +34,7 @@ module.exports = class App extends events.EventEmitter {
             this._l.info('Polling started');
         } catch (err) {
             this._l.info('Error in start, error was', err);
+            process.exit(1);
         }
     }
 

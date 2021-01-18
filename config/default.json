@@ -1,6 +1,6 @@
 {
     "app": {
-        "token": "1312267022:AAHiwH7Ss4Ek5zIFFb66ygzyRnJwDcpeG-s"
+        "token": "540434112:AAG82tW9GBwDe7xx4xxFndRZb_hWV4uASZM"
     },
     "logger": {
         "categories": {
@@ -13,7 +13,7 @@
         },
         "appenders": {
             "all": {
-                "type": "file",
+                "type": "fileSync",
                 "maxLogSize": 52428800,
                 "filename": "/Users/armanoganesyan/Projects/rating-bot/logs/all.log",
                 "layout": {
