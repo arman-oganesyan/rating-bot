@@ -47,12 +47,24 @@ module.exports.Mongo = class Mongo extends EventEmitter {
 
             if (!record) {
                 this._l.info(`No user was found with id '${userId}', perform insert`);
-                const insertResult = await user_rating.insertOne({ 'userId': userId, 'rating': 1 });
-                return value;
+                await user_rating.insertOne({ 'userId': userId, 'rating': value });
+                return { rating: value };
             } else {
-                this._l.info(`User was found, update him`);
-                const updateResult = await user_rating.updateOne({ 'userId': userId }, { '$inc': { rating: value } });
-                return record.rating + value;
+                this._l.info(`User was found`);
+
+                const new_rating = record.rating + value;
+                const achieved100 = !record.achieved100 && new_rating >= 100;
+                
+                if (achieved100) {
+                    this._l.info(`User achieved100, update him with rating ${new_rating}`);
+                    await user_rating.updateOne({ 'userId': userId }, { '$inc': { rating: value }, '$set': { achieved100: achieved100 } });
+                }
+                else {
+                    this._l.info(`Update user with rating ${new_rating}`)
+                    await user_rating.updateOne({ 'userId': userId }, { '$inc': { rating: value } });
+                }
+                this._l.debug(`User updated, return result`)
+                return { rating: new_rating, achievment: achieved100 };
             }
         }
         catch(error) {

@@ -86,7 +86,12 @@ module.exports = class App extends events.EventEmitter {
                 }
 
                 const rating = await this._mongo.changeRating(message.reply_to_message.from.id, reactionValue);
-                this._bot.sendMessage(message.chat.id, `Рейтинг '${message.reply_to_message.from.first_name}' ${rating}`);
+                this._bot.sendMessage(message.chat.id, `Рейтинг '${message.reply_to_message.from.first_name}' ${rating.rating}`);
+                
+                if (rating.achievment) {
+                    this._bot.sendMessage(message.chat.id, `Поздравляем '${message.reply_to_message.from.first_name}' - он преодолел отметку в 100 очков рейтинга! А чего добился ты?!`);
+                }
+                
                 return;
             }
         }
