@@ -23,7 +23,7 @@ module.exports.Mongo = class Mongo extends EventEmitter {
                 else {
                     this._l.info('Connected without errors');
                     this._mongo = client;
-                    this._rating = this._mongo.db('rating')
+                    this._rating = this._mongo.db(this._conf.collection)
                     resolve();
                 }
             });
@@ -57,6 +57,27 @@ module.exports.Mongo = class Mongo extends EventEmitter {
         }
         catch(error) {
             this._l.error(`Error while performing addRating`)
+        }
+    }
+
+    async getRaiting(userId) {
+        try {
+            this._l.info(`getRaiting for user with id '${userId}'`);
+
+            const user_rating = this._rating.collection('user_rating');
+            const record = await user_rating.findOne({ 'userId': userId });
+            
+            this._l.debug('findOne result', record);
+
+            if (!record) {
+                return 0;
+            }
+
+            return record.rating;
+        }
+        catch(error) {
+            this._l.error(`Error while performing getRaiting`)
+            return 0;
         }
     }
 }
