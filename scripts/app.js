@@ -2,6 +2,7 @@ const logger = require('./logger');
 const tg = require('node-telegram-bot-api');
 const events = require('events');
 const { Mongo } = require('./mongo');
+const { networkInterfaces } = require('os');
 
 module.exports = class App extends events.EventEmitter {
 
@@ -21,7 +22,7 @@ module.exports = class App extends events.EventEmitter {
 
         this._bot = new tg(this._config.app.token, this._config.tg);
         this._bot.on('text', (message) => this.onMessage(message));
-        
+
     }
 
     async start() {
@@ -78,8 +79,7 @@ module.exports = class App extends events.EventEmitter {
 
             const reactionValue = this._getReaction(message.text);
 
-            if (reactionValue)
-            {
+            if (reactionValue) {
                 if (message.from.id === message.reply_to_message.from.id) {
                     this._bot.sendMessage(message.chat.id, 'Нельзя голосовать за себя');
                     return;
@@ -87,11 +87,11 @@ module.exports = class App extends events.EventEmitter {
 
                 const rating = await this._mongo.changeRating(message.reply_to_message.from.id, reactionValue);
                 this._bot.sendMessage(message.chat.id, `Рейтинг '${message.reply_to_message.from.first_name}' ${rating.rating}`);
-                
+
                 if (rating.achievment) {
                     this._bot.sendMessage(message.chat.id, `Поздравляем '${message.reply_to_message.from.first_name}' - он преодолел отметку в 100 очков рейтинга! А чего добился ты?!`);
                 }
-                
+
                 return;
             }
         }
@@ -104,14 +104,34 @@ module.exports = class App extends events.EventEmitter {
 
             if (firstEntity.type == 'bot_command') {
                 const mention = message.text.substring(firstEntity.offset, firstEntity.offset + firstEntity.length);
-                
+
                 if (mention.endsWith('@' + this._me.username)) { // be sure that the command is for this bot
                     if (mention.startsWith('/show')) {
                         const show_me = message.reply_to_message === undefined;
                         const user_id = show_me ? message.from.id : message.reply_to_message.from.id;
-                        const user_name = show_me ? message.from.first_name : message.reply_to_message.from.first_name; 
+                        const user_name = show_me ? message.from.first_name : message.reply_to_message.from.first_name;
                         const raiting = await this._mongo.getRaiting(user_id);
                         this._bot.sendMessage(message.chat.id, `Рейтинг '${user_name}' ${raiting}`);
+                        return;
+                    }
+                    else if (mention.startsWith('/system')) {
+
+                        const nets = networkInterfaces();
+                        const results = Object.create(null); // Or just '{}', an empty object
+
+                        for (const name of Object.keys(nets)) {
+                            for (const net of nets[name]) {
+                                // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
+                                if (net.family === 'IPv4' && !net.internal) {
+                                    if (!results[name]) {
+                                        results[name] = [];
+                                    }
+                                    results[name].push(net);
+                                }
+                            }
+                        }
+
+                        this._bot.sendMessage(message.chat.id, JSON.stringify(results, null, 4));
                         return;
                     }
                 }
