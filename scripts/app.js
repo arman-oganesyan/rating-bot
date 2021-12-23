@@ -74,6 +74,11 @@ module.exports = class App extends events.EventEmitter {
     // handlers
     async onMessage(message) {
         this._l.info(`Handle message (id=${message.message_id}; chat=${message.chat.id} from=${message.from.id}): reply_to_message=${Boolean(message.reply_to_message)}; text=${Boolean(message.text)}`);
+        
+        // Increment statistic
+        this._l.info(`Increment statistic ${await this._mongo.incrementMessageStatistic(message.chat.id, message.from.id, message.date)}`);
+        console.log(message.date)
+
         if (message.reply_to_message && message.text) {
 
             const reactionValue = this._getReaction(message.text);
@@ -104,15 +109,35 @@ module.exports = class App extends events.EventEmitter {
 
             if (firstEntity.type == 'bot_command') {
                 const mention = message.text.substring(firstEntity.offset, firstEntity.offset + firstEntity.length);
-                
-                if (mention.endsWith('@' + this._me.username)) { // be sure that the command is for this bot
-                    if (mention.startsWith('/show')) {
+                const lookup = '@' + this._me.username;
+
+                if (mention.endsWith(lookup)) { // be sure that the command is for this bot
+                    
+                    const command = mention.substring(0, mention.length - lookup.length);
+                    
+                    if (command === '/show') {
                         const show_me = message.reply_to_message === undefined;
                         const user_id = show_me ? message.from.id : message.reply_to_message.from.id;
                         const user_name = show_me ? message.from.first_name : message.reply_to_message.from.first_name; 
                         const raiting = await this._mongo.getRaiting(user_id);
                         this._bot.sendMessage(message.chat.id, `Рейтинг '${user_name}' ${raiting}`);
                         return;
+                    }
+                    else if (command === '/stat') {
+                        return;
+                        let stat = await this._mongo.getChatStat(message.chat.id);
+
+                        let response = '<b>Статистика за всё время</b>\n';
+
+                        stat.[Symbol.iterator] = function* () {
+                            yield* [...this.entries()].sort((a, b) => a[1] - b[1]);
+                        }
+
+                        stat.forEach((value, key) => {
+                            response += `\n${key}: ${value}`
+                        });
+
+                        this._bot.sendMessage(message.chat.id, response, {parse_mode: 'HTML'});
                     }
                 }
             }

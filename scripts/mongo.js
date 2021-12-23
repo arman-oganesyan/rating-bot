@@ -42,7 +42,7 @@ module.exports.Mongo = class Mongo extends EventEmitter {
 
             const user_rating = this._rating.collection('user_rating');
             const record = await user_rating.findOne({ 'userId': userId });
-            
+
             this._l.debug('findOne result', record);
 
             if (!record) {
@@ -54,7 +54,7 @@ module.exports.Mongo = class Mongo extends EventEmitter {
 
                 const new_rating = record.rating + value;
                 const achieved100 = !record.achieved100 && new_rating >= 100;
-                
+
                 if (achieved100) {
                     this._l.info(`User achieved100, update him with rating ${new_rating}`);
                     await user_rating.updateOne({ 'userId': userId }, { '$inc': { rating: value }, '$set': { achieved100: achieved100 } });
@@ -67,7 +67,7 @@ module.exports.Mongo = class Mongo extends EventEmitter {
                 return { rating: new_rating, achievment: achieved100 };
             }
         }
-        catch(error) {
+        catch (error) {
             this._l.error(`Error while performing addRating`)
         }
     }
@@ -78,7 +78,7 @@ module.exports.Mongo = class Mongo extends EventEmitter {
 
             const user_rating = this._rating.collection('user_rating');
             const record = await user_rating.findOne({ 'userId': userId });
-            
+
             this._l.debug('findOne result', record);
 
             if (!record) {
@@ -87,9 +87,65 @@ module.exports.Mongo = class Mongo extends EventEmitter {
 
             return record.rating;
         }
-        catch(error) {
+        catch (error) {
             this._l.error(`Error while performing getRaiting`)
             return 0;
         }
+    }
+
+    async incrementMessageStatistic(chatId, userId, timestamp) {
+        try {
+            this._l.info(`incrementMessageStatistic in chat ${chatId} for user ${userId} at ${timestamp}`);
+
+            if (!chatId || !userId)
+                return;
+
+            const lookup_key = { 'chatId': chatId, 'userId': userId, 'date': this._messageTimestampPrepare(timestamp) };
+            const statCollection = this._rating.collection('group_messages_statistic');
+            const userStat = await statCollection.findOne(lookup_key);
+
+            this._l.debug(`Retrived userStat ${JSON.stringify(userStat)}`);
+
+            if (userStat) {
+                await statCollection.updateOne({_id: userStat._id}, { '$inc': { 'messagesCnt': 1 } });
+            }
+            else {
+                lookup_key.messagesCnt = 1;
+                await statCollection.insertOne(lookup_key);
+            }
+        }
+        catch (error) {
+            this._l.error(`Error while perfoming incrementMessageStatistic. Error was: `, error);
+        }
+    }
+
+    async getChatStat(chatId) {
+        try {
+            this._l.info(`getChatStat for chat with id '${chatId}'`);
+
+            const statCollection = this._rating.collection('group_messages_statistic');
+            const chatStat = await statCollection.find({'chatId': chatId});
+
+            let stat = new Map();
+
+            await chatStat.forEach((item) => {
+                let prev_val = 0;
+                if (stat.has(item.userId))
+                    prev_val = stat.get(item.userId);
+                
+                stat.set(item.userId, item.messagesCnt + prev_val);
+            })
+
+            return stat;
+        }
+        catch (error) {
+            this._l.error(`Error while perfoming getChatStat. Error was: `, error);
+        }
+    }
+
+    _messageTimestampPrepare(timestamp) {
+        let date = new Date(timestamp * 1000);
+        date.setUTCHours(0, 0, 0, 0);
+        return date.getTime() / 1000;
     }
 }
