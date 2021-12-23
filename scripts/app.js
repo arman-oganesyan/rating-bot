@@ -21,7 +21,7 @@ module.exports = class App extends events.EventEmitter {
         this._mongo = new Mongo(config.mongo);
 
         this._bot = new tg(this._config.app.token, this._config.tg);
-        this._bot.on('text', (message) => this.onMessage(message));
+        this._bot.on('message', (message) => this.onMessage(message));
 
     }
 
