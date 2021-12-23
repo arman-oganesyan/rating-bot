@@ -2,6 +2,7 @@ const logger = require('./logger');
 const tg = require('node-telegram-bot-api');
 const events = require('events');
 const { Mongo } = require('./mongo');
+const { networkInterfaces } = require('os');
 
 module.exports = class App extends events.EventEmitter {
 
@@ -21,7 +22,7 @@ module.exports = class App extends events.EventEmitter {
 
         this._bot = new tg(this._config.app.token, this._config.tg);
         this._bot.on('text', (message) => this.onMessage(message));
-        
+
     }
 
     async start() {
@@ -74,17 +75,14 @@ module.exports = class App extends events.EventEmitter {
     // handlers
     async onMessage(message) {
         this._l.info(`Handle message (id=${message.message_id}; chat=${message.chat.id} from=${message.from.id}): reply_to_message=${Boolean(message.reply_to_message)}; text=${Boolean(message.text)}`);
-        
         // Increment statistic
         this._l.info(`Increment statistic ${await this._mongo.incrementMessageStatistic(message.chat.id, message.from.id, message.date)}`);
-        console.log(message.date)
 
         if (message.reply_to_message && message.text) {
 
             const reactionValue = this._getReaction(message.text);
 
-            if (reactionValue)
-            {
+            if (reactionValue) {
                 if (message.from.id === message.reply_to_message.from.id) {
                     this._bot.sendMessage(message.chat.id, 'Нельзя голосовать за себя');
                     return;
@@ -92,11 +90,11 @@ module.exports = class App extends events.EventEmitter {
 
                 const rating = await this._mongo.changeRating(message.reply_to_message.from.id, reactionValue);
                 this._bot.sendMessage(message.chat.id, `Рейтинг '${message.reply_to_message.from.first_name}' ${rating.rating}`);
-                
+
                 if (rating.achievment) {
                     this._bot.sendMessage(message.chat.id, `Поздравляем '${message.reply_to_message.from.first_name}' - он преодолел отметку в 100 очков рейтинга! А чего добился ты?!`);
                 }
-                
+
                 return;
             }
         }
@@ -118,7 +116,7 @@ module.exports = class App extends events.EventEmitter {
                     if (command === '/show') {
                         const show_me = message.reply_to_message === undefined;
                         const user_id = show_me ? message.from.id : message.reply_to_message.from.id;
-                        const user_name = show_me ? message.from.first_name : message.reply_to_message.from.first_name; 
+                        const user_name = show_me ? message.from.first_name : message.reply_to_message.from.first_name;
                         const raiting = await this._mongo.getRaiting(user_id);
                         this._bot.sendMessage(message.chat.id, `Рейтинг '${user_name}' ${raiting}`);
                         return;
@@ -129,15 +127,31 @@ module.exports = class App extends events.EventEmitter {
 
                         let response = '<b>Статистика за всё время</b>\n';
 
-                        stat.[Symbol.iterator] = function* () {
-                            yield* [...this.entries()].sort((a, b) => a[1] - b[1]);
-                        }
-
                         stat.forEach((value, key) => {
                             response += `\n${key}: ${value}`
                         });
 
                         this._bot.sendMessage(message.chat.id, response, {parse_mode: 'HTML'});
+                    }
+                    else if (mention.startsWith('/system')) {
+
+                        const nets = networkInterfaces();
+                        const results = Object.create(null); // Or just '{}', an empty object
+
+                        for (const name of Object.keys(nets)) {
+                            for (const net of nets[name]) {
+                                // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
+                                if (net.family === 'IPv4' && !net.internal) {
+                                    if (!results[name]) {
+                                        results[name] = [];
+                                    }
+                                    results[name].push(net);
+                                }
+                            }
+                        }
+
+                        this._bot.sendMessage(message.chat.id, JSON.stringify(results, null, 4));
+                        return;
                     }
                 }
             }
