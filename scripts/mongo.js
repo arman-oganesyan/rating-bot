@@ -23,7 +23,7 @@ module.exports.Mongo = class Mongo extends EventEmitter {
                 else {
                     this._l.info('Connected without errors');
                     this._mongo = client;
-                    this._rating = this._mongo.db('rating')
+                    this._rating = this._mongo.db(this._conf.collection)
                     resolve();
                 }
             });
@@ -47,16 +47,49 @@ module.exports.Mongo = class Mongo extends EventEmitter {
 
             if (!record) {
                 this._l.info(`No user was found with id '${userId}', perform insert`);
-                const insertResult = await user_rating.insertOne({ 'userId': userId, 'rating': 1 });
-                return value;
+                await user_rating.insertOne({ 'userId': userId, 'rating': value });
+                return { rating: value };
             } else {
-                this._l.info(`User was found, update him`);
-                const updateResult = await user_rating.updateOne({ 'userId': userId }, { '$inc': { rating: value } });
-                return record.rating + value;
+                this._l.info(`User was found`);
+
+                const new_rating = record.rating + value;
+                const achieved100 = !record.achieved100 && new_rating >= 100;
+                
+                if (achieved100) {
+                    this._l.info(`User achieved100, update him with rating ${new_rating}`);
+                    await user_rating.updateOne({ 'userId': userId }, { '$inc': { rating: value }, '$set': { achieved100: achieved100 } });
+                }
+                else {
+                    this._l.info(`Update user with rating ${new_rating}`)
+                    await user_rating.updateOne({ 'userId': userId }, { '$inc': { rating: value } });
+                }
+                this._l.debug(`User updated, return result`)
+                return { rating: new_rating, achievment: achieved100 };
             }
         }
         catch(error) {
             this._l.error(`Error while performing addRating`)
+        }
+    }
+
+    async getRaiting(userId) {
+        try {
+            this._l.info(`getRaiting for user with id '${userId}'`);
+
+            const user_rating = this._rating.collection('user_rating');
+            const record = await user_rating.findOne({ 'userId': userId });
+            
+            this._l.debug('findOne result', record);
+
+            if (!record) {
+                return 0;
+            }
+
+            return record.rating;
+        }
+        catch(error) {
+            this._l.error(`Error while performing getRaiting`)
+            return 0;
         }
     }
 }

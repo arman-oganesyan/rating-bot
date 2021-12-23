@@ -2,7 +2,7 @@ const logger = require('./logger');
 const tg = require('node-telegram-bot-api');
 const events = require('events');
 const { Mongo } = require('./mongo');
-const { RedisClient } = require('./redis');
+const { networkInterfaces } = require('os');
 
 module.exports = class App extends events.EventEmitter {
 
@@ -10,7 +10,7 @@ module.exports = class App extends events.EventEmitter {
         super();
 
         this._l = logger.ctxLogger('app');
-        this._l.info('create');
+        this._l.info('create with config', config);
 
         this._config = config;
         this._reactions = new Map([
@@ -32,7 +32,8 @@ module.exports = class App extends events.EventEmitter {
             await this._mongo.connect();
             this._l.info('Mongo connected');
 
-            this._redis.connect();
+            await this._getMe();
+            this._l.info('Me is obtained', this._me);
 
             await this._bot.startPolling();
             this._l.info('Polling started');
@@ -61,39 +62,83 @@ module.exports = class App extends events.EventEmitter {
         }
     }
 
+    _getMe() {
+        return new Promise((resolve, reject) => {
+            this._bot.getMe().then((user) => {
+                this._l.info('Done getting me');
+                this._me = user;
+                resolve();
+            }).catch(() => {
+                this._l.error('Error while getMe!');
+                reject();
+            });
+        });
+    }
+
     // handlers
     async onMessage(message) {
         this._l.info(`Handle message (id=${message.message_id}; chat=${message.chat.id} from=${message.from.id}): reply_to_message=${Boolean(message.reply_to_message)}; text=${Boolean(message.text)}`);
         if (message.reply_to_message && message.text) {
-            const value = this._getReaction(message.text);
 
-            if (!value)
-                return;
+            const reactionValue = this._getReaction(message.text);
 
-            const userKey = `users:vote-limit:${message.from.id}`;
-            const ttl = 0;
-            try {
-                ttl = await this._redis.ttl(userKey);
-            }
-            catch (err) {
-                this._l.error('Error while gettin TTL, error was', err);
-            }
+            if (reactionValue) {
+                if (message.from.id === message.reply_to_message.from.id) {
+                    this._bot.sendMessage(message.chat.id, 'Нельзя голосовать за себя');
+                    return;
+                }
 
-            if (ttl > 0) {
-                this._bot.sendMessage(message.chat.id, `Так часто нельзя. Нужно ожидать еще ${ttl} секунд(у)`, { reply_to_message_id: message.message_id });
-                return;
-            }
+                const rating = await this._mongo.changeRating(message.reply_to_message.from.id, reactionValue);
+                this._bot.sendMessage(message.chat.id, `Рейтинг '${message.reply_to_message.from.first_name}' ${rating.rating}`);
 
-            if (message.from.id === message.reply_to_message.from.id) {
-                this._bot.sendMessage(message.chat.id, 'Нельзя голосовать за себя');
+                if (rating.achievment) {
+                    this._bot.sendMessage(message.chat.id, `Поздравляем '${message.reply_to_message.from.first_name}' - он преодолел отметку в 100 очков рейтинга! А чего добился ты?!`);
+                }
+
                 return;
             }
+        }
 
-            const voteTtl = this._config.voteTtl ? this._config.voteTtl : 60;
-            const rating = await this._mongo.changeRating(message.reply_to_message.from.id, value);
-            this._redis.impl.setex(userKey, voteTtl , '');
+        if (message.entities) {
+            const firstEntity = message.entities[0];
+            if (firstEntity.offset != 0) { // the message must starts with command
+                return;
+            }
 
-            this._bot.sendMessage(message.chat.id, `Рейтинг '${message.reply_to_message.from.first_name}' ${rating} `);
+            if (firstEntity.type == 'bot_command') {
+                const mention = message.text.substring(firstEntity.offset, firstEntity.offset + firstEntity.length);
+
+                if (mention.endsWith('@' + this._me.username)) { // be sure that the command is for this bot
+                    if (mention.startsWith('/show')) {
+                        const show_me = message.reply_to_message === undefined;
+                        const user_id = show_me ? message.from.id : message.reply_to_message.from.id;
+                        const user_name = show_me ? message.from.first_name : message.reply_to_message.from.first_name;
+                        const raiting = await this._mongo.getRaiting(user_id);
+                        this._bot.sendMessage(message.chat.id, `Рейтинг '${user_name}' ${raiting}`);
+                        return;
+                    }
+                    else if (mention.startsWith('/system')) {
+
+                        const nets = networkInterfaces();
+                        const results = Object.create(null); // Or just '{}', an empty object
+
+                        for (const name of Object.keys(nets)) {
+                            for (const net of nets[name]) {
+                                // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
+                                if (net.family === 'IPv4' && !net.internal) {
+                                    if (!results[name]) {
+                                        results[name] = [];
+                                    }
+                                    results[name].push(net);
+                                }
+                            }
+                        }
+
+                        this._bot.sendMessage(message.chat.id, JSON.stringify(results, null, 4));
+                        return;
+                    }
+                }
+            }
         }
     }
 }
