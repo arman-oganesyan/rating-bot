@@ -3,6 +3,7 @@ const tg = require('node-telegram-bot-api');
 const events = require('events');
 const { Mongo } = require('./mongo');
 const { networkInterfaces } = require('os');
+const { RedisClient } = require('./redis');
 
 module.exports = class App extends events.EventEmitter {
 
@@ -20,14 +21,18 @@ module.exports = class App extends events.EventEmitter {
 
         this._mongo = new Mongo(config.mongo);
 
-        this._bot = new tg(this._config.app.token, this._config.tg);
-        this._bot.on('text', (message) => this.onMessage(message));
+        this._redis = new RedisClient(config.redis);
 
+        this._bot = new tg(this._config.app.token, this._config.tg);
+        this._bot.on('message', (message) => this.onMessage(message));
     }
 
     async start() {
         this._l.info('start app');
         try {
+            await this._redis.connect();
+            this._l.info('Redis connected');
+
             await this._mongo.connect();
             this._l.info('Mongo connected');
 
@@ -48,6 +53,8 @@ module.exports = class App extends events.EventEmitter {
         this._l.info('bot stopped');
         await this._mongo.disconnect();
         this._l.info('mongo disconnected');
+        await this._redis.disconnect();
+        this._l.info('redis disconnected');
     }
 
     // private methods
@@ -85,11 +92,30 @@ module.exports = class App extends events.EventEmitter {
                     return;
                 }
 
+                const ttl_key = `vote_limit:${message.from.id}:${message.chat.id}:${message.reply_to_message.from.id}`;
+
+                if (this._config.app.vote_timeout > 0) {
+                    this._l.info(`Check TTL for ${ttl_key}`);
+                    const ttl_value = await this._redis.ttl(ttl_key);
+                    this._l.info(`TTL for ${ttl_value} is ${ttl_value}`);
+
+                    // don't vote too often
+                    if (ttl_value > 0) {
+                        this._bot.sendMessage(message.chat.id, `Нельзя так часто. Жди <b>${ttl_value}</b> сек.`, { parse_mode: 'HTML' });
+                        return;
+                    }
+                }
+
                 const rating = await this._mongo.changeRating(message.reply_to_message.from.id, reactionValue);
                 this._bot.sendMessage(message.chat.id, `Рейтинг '${message.reply_to_message.from.first_name}' ${rating.rating}`);
 
                 if (rating.achievment) {
                     this._bot.sendMessage(message.chat.id, `Поздравляем '${message.reply_to_message.from.first_name}' - он преодолел отметку в 100 очков рейтинга! А чего добился ты?!`);
+                }
+
+                if (this._config.app.vote_timeout > 0) {
+                    this._l.info(`Update TTL for ${ttl_key}`);
+                    this._redis.impl.set(ttl_key, 0, { EX: this._config.app.vote_timeout });
                 }
 
                 return;
