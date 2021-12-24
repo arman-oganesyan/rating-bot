@@ -35,7 +35,9 @@
         }
     },
     "redis": {
-        "host": "<REDIS IP>",
-        "port": 16379
+        "socket": {
+            "host": "<REDIS IP>",
+            "port": 16379
+        }
     }
 }
