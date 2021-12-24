@@ -33,5 +33,9 @@
         "polling": {
             "autoStart": false
         }
+    },
+    "redis": {
+        "host": "<REDIS IP>",
+        "port": 16379
     }
 }
