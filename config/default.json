@@ -37,7 +37,7 @@
     "redis": {
         "socket": {
             "host": "<REDIS IP>",
-            "port": 16379
+            "port": 6379
         }
     }
 }
