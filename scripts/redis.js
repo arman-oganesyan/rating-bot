@@ -5,6 +5,7 @@ module.exports.RedisClient = class {
 
     constructor(config) {
         this._config = config;
+        this._config.socket.reconnectStrategy = retries => Math.min(retries * 250, 3000);
         this._connected = false;
         this._l = logger.ctxLogger('redis.main');
         this._l.debug('create');
