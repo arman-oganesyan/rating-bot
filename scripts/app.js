@@ -83,7 +83,7 @@ module.exports = class App extends events.EventEmitter {
     // handlers
     async onMessage(message) {
         this._l.info(`Handle message (id=${message.message_id}; chat=${message.chat.id}; chat.type=${message.chat.type}; from=${message.from.id}); reply_to_message=${Boolean(message.reply_to_message)}; text=${Boolean(message.text)}`);
-        
+
         if (message.chat.type === 'private') {
             await this.handlePrivateMessage(message);
         } else if (message.chat.type === 'group' || message.chat.type === 'supergroup') {
@@ -117,7 +117,17 @@ module.exports = class App extends events.EventEmitter {
 
     async handleGroupMessage(message) {
 
+        const command_reply = await this.isAnswerToCommand(message);
+        if (command_reply) {
+            if (command_reply === 'commandSetTimeOffset') {
+                await this.handleAnswerCommandSetTimeOffset(message);
+                return;
+            }
+        }
+
         if (message.reply_to_message && message.text) {
+
+            // AT FIRST CHECK IF IT'S AN EXPECTED ANSWER FOR A COMMAND
 
             const reactionValue = this._getReaction(message.text);
 
@@ -180,8 +190,14 @@ module.exports = class App extends events.EventEmitter {
                     else if (command === '/stat') {
                         return await this.commandStatAll(message);
                     }
-                    else if (mention.startsWith('/system')) {
+                    else if (command === '/system') {
                         return await this.commandSystem(message);
+                    }
+                    else if (command === '/test') {
+                        return await this.commandSetTimeOffset(message);
+                    }
+                    else if (command === '/test2') {
+                        return await this.commandGetTimeOffset(message);
                     }
                 }
             }
@@ -191,7 +207,7 @@ module.exports = class App extends events.EventEmitter {
     async commandHelp(message) {
         this._l.info(`Handle command help in chat ${message.chat.id}`);
 
-        const help =`<b>Для чего нужен этот бот?</b>
+        const help = `<b>Для чего нужен этот бот?</b>
 
 Бот предназначен для групп. Он позволяет вам ставить лайки и дизлайки на чужие сообщения, а также ведет статистику по сообщениям в группе, а именно: кто и сколько сообщений написал. Эту статистику можно будет просмотреть за день, месяц или вообще за всё время.
 
@@ -204,7 +220,12 @@ module.exports = class App extends events.EventEmitter {
 <b>Доступные команды</b>
 
 /help - вывод этой справки
+
 /show - показывает ваш рейтинг. Чтобы узнать рейтинг другого пользователя отправьте команду в ответ на его сообщение
+
+/stat - показывает всю статистику по сообщениям для каждого пользователя (под всей подразумевается та, которую собрал бот с момента включения этой функции)
+
+/set_timezone X - устанавливает смещение часового пояса относительно UTC, где X указывается в часах (для GMT+3 это 3) 
         `;
 
         this._bot.sendMessage(message.chat.id, help, { parse_mode: "HTML" });
@@ -241,8 +262,8 @@ module.exports = class App extends events.EventEmitter {
     }
 
     async commandStatAll(message) {
-        let stat = await this._mongo.getChatStat(message.chat.id);
-        stat = new Map([...stat.entries()].sort((a, b) => b[1] - a[1]));
+        let data = await this._mongo.getChatStat(message.chat.id);
+        data.stat = new Map([...data.stat.entries()].sort((a, b) => b[1] - a[1]));
 
         let response = '<b>Статистика за всё время</b>\n';
 
@@ -255,7 +276,7 @@ module.exports = class App extends events.EventEmitter {
 
         let total = 0;
         let index = 1;
-        for (const [key, value] of stat) {
+        for (const [key, value] of data.stat) {
             this._l.info(`Get chat member chat=${message.chat.id} member=${key}`);
             const chatMember = await this._bot.getChatMember(message.chat.id, key);
             this._l.debug(`Member received ${JSON.stringify(chatMember)}`);
@@ -272,14 +293,72 @@ module.exports = class App extends events.EventEmitter {
                 mention_user = '@' + mention_user;
             }
 
-            
+
             response += `\n${index}. ${mention_user}: <i>${value}</i> ${index_emoji(index++)}`
             total += value;
         };
 
         response += `\n\nВсего сообщений: ${total}`;
+        if (data.from) {
+            let date = new Date(data.from * 1000);
+            console.log(date);
+        }
 
         this._l.info(`Send message with statistic`);
         this._bot.sendMessage(message.chat.id, response, { parse_mode: 'HTML' });
+    }
+
+    async commandSetTimeOffset(message) {
+        const current_offset = await this._mongo.getTimeOffset(message.chat.id);
+        const reply = `Текущее значение ${current_offset} относительно UTC в часах. Пришли новое значение в ответ на это сообщение.`;
+
+        const bot_message = await this._bot.sendMessage(message.chat.id, reply, { reply_to_message_id: message.message_id, reply_markup: { force_reply: true, selective: true } });
+
+        const key = this.commandReplyKey(bot_message.message_id, message.from.id);
+        await this._redis.impl.set(key, 'commandSetTimeOffset', { EX: 120 });
+    }
+
+    async commandGetTimeOffset(message) {
+        await this._mongo.getTimeOffset(message.chat.id);
+    }
+
+    async isAnswerToCommand(message) {
+        if (message && message.text && message.reply_to_message) {
+
+            const key = this.commandReplyKey(message.reply_to_message.message_id, message.from.id);
+            const command = await this._redis.impl.get(key);
+
+            console.log(command);
+
+            return command;
+        }
+        
+    }
+
+    commandReplyKey(messageId, fromId) {
+        return `command:${messageId}:${fromId}`;
+    }
+
+    async handleAnswerCommandSetTimeOffset(message, commandKey) {
+        try {
+            this._l.info(`Delete command buffer from redis`);
+            await this._redis.impl.del(commandKey);
+
+            if (message.text.length > 3) {
+                await this._bot.sendMessage(message.chat.id, `Слишком много символов. Ошибка выполнения команды`);
+                return;
+            }
+
+            const offset = parseInt(message.text, 10);
+            if (offset && typeof offset === 'number') {
+                await this._mongo.setTimeOffset(message.chat.id, offset);
+                await this._bot.sendMessage(message.chat.id, `Часовой пояс установлен (${offset} часов относительно UTC)`);
+            } else {
+                await this._bot.sendMessage(message.chat.id, `Невозможно распознать число в вашем сообщении`, { reply_to_message_id: message.message_id});
+            }
+        }
+        catch (error) {
+            await this._bot.sendMessage(message.chat.id, `Невозможно распознать число в вашем сообщении`, { reply_to_message_id: message.message_id});
+        }
     }
 }
