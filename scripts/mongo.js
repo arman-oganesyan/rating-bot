@@ -63,7 +63,38 @@ module.exports.Mongo = class Mongo extends EventEmitter {
             this._l.info(`Updated/Inserted group configuration. Result=${JSON.stringify(result.result)}`);
         }
         catch (error) {
-            this._l.error(`Error while performing setPinnedStat, error was:\n${error}}`)
+            this._l.error(`Error while performing setPinnedStat, error was:\n${error}}`);
+        }
+    }
+    
+    async setTimeOffset(chatId, value) {
+        try {
+            this._l.info(`setTimeOffset ${value} for chatId=${chatId}`);
+
+            const group_settings = this._rating.collection('group_settings');
+            const result = await group_settings.updateOne({ 'chatId': chatId }, { '$set': { 'timeOffset': value } }, { 'upsert': true });
+
+            this._l.info(`Updated/Inserted group configuration. Result=${JSON.stringify(result.result)}`);
+        }
+        catch (error) {
+            this._l.error(`Error while performing setTimeOffset, error was:\n${JSON.stringify(error)}`)
+        }
+    }
+
+    async getTimeOffset(chatId) {
+        try {
+            this._l.info(`getTimeOffset for chatId=${chatId}`);
+
+            const group_settings = this._rating.collection('group_settings');
+            const result = await group_settings.findOne({ 'chatId': chatId });
+
+            this._l.info(`Group settings=${JSON.stringify(result)}`);
+
+            return result ? result.timeOffset : 0;
+        }
+        catch (error) {
+            this._l.error(`Error while performing getTimeOffset, error was:\n${JSON.stringify(error)}`)
+            return 0;
         }
     }
 
@@ -158,6 +189,7 @@ module.exports.Mongo = class Mongo extends EventEmitter {
             const chatStat = await statCollection.find({'chatId': chatId});
 
             let stat = new Map();
+            let from;
 
             await chatStat.forEach((item) => {
                 let prev_val = 0;
@@ -165,9 +197,10 @@ module.exports.Mongo = class Mongo extends EventEmitter {
                     prev_val = stat.get(item.userId);
                 
                 stat.set(item.userId, item.messagesCnt + prev_val);
+                from = from ? Math.min(from, item.date) : item.date;
             })
 
-            return stat;
+            return { 'stat': stat, 'from': from };
         }
         catch (error) {
             this._l.error(`Error while perfoming getChatStat. Error was: `, error);
