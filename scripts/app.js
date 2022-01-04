@@ -241,6 +241,18 @@ module.exports = class App extends events.EventEmitter {
     }
 
     async commandStatAll(message) {
+        this._l.info(`commandStatAll for chat ${message.chat.id} from user ${message.from.id}`);
+        const ttl_key = `command_ttl:stat:${message.chat.id}`;
+        
+        this._l.info(`Check ttl for command`);
+        const ttl_value = await this._redis.impl.ttl(ttl_key);
+
+        if (ttl_value > 0) {
+            this._l.info(`TTL for command is ${ttl_value} seconds`);
+            await this._bot.sendMessage(message.chat.id, `Следующее использование возможно через ${this.formatSeconds(ttl_value)}`, {reply_to_message_id: message.message_id});
+            return;
+        }
+
         let stat = await this._mongo.getChatStat(message.chat.id);
         stat = new Map([...stat.entries()].sort((a, b) => b[1] - a[1]));
 
@@ -280,6 +292,30 @@ module.exports = class App extends events.EventEmitter {
         response += `\n\nВсего сообщений: ${total}`;
 
         this._l.info(`Send message with statistic`);
-        this._bot.sendMessage(message.chat.id, response, { parse_mode: 'HTML' });
+        await this._bot.sendMessage(message.chat.id, response, { parse_mode: 'HTML' });
+
+        if (this._config.app.stat_timeout > 0) {
+            this._l.info(`Set ${this._config.stat_timeout} ttl for /stat command`);
+            await this._redis.impl.set(ttl_key, 0, { EX: this._config.app.stat_timeout });
+        }
+    }
+
+    formatSeconds(value) {
+        const seconds = value % 60;
+        const minutes = (Math.floor(value / 60)) % 60;
+        const hours = Math.floor(value  / 3600);
+    
+        let format = '';
+    
+        if (hours > 0) {
+            format += `${hours} ч. `;
+        }
+        if (minutes > 0) {
+            format += `${minutes} мин. `;
+        }
+        if (seconds > 0) {
+            format += `${seconds} сек.`;
+        }
+        return format;
     }
 }

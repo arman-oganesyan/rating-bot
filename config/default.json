@@ -1,6 +1,8 @@
 {
     "app": {
-        "token": "<BOT TOKEN>"
+        "token": "<BOT TOKEN>",
+        "vote_timeout": 0,
+        "stat_timeout": 10800
     },
     "logger": {
         "categories": {
