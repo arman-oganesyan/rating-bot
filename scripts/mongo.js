@@ -36,6 +36,37 @@ module.exports.Mongo = class Mongo extends EventEmitter {
         });
     }
 
+    async getPinnedStat(chatId) {
+        try {
+            this._l.info(`getPinnedStat for chatId=${chatId}`);
+
+            const group_settings = this._rating.collection('group_settings');
+            const result = await group_settings.findOne({ 'chatId': chatId });
+
+            this._l.info(`Group settings=${JSON.stringify(result)}`);
+
+            return result ? result.pinnedStatMessageId : undefined;
+        }
+        catch (error) {
+            this._l.error(`Error while performing getPinnedStat, error was:\n${JSON.stringify(error)}`)
+            return 0;
+        }
+    }
+
+    async setPinnedStat(chatId, messageId) {
+        try {
+            this._l.info(`setPinnedStat for chatId=${chatId} and messageId=${messageId}`);
+
+            const group_settings = this._rating.collection('group_settings');
+            const result = await group_settings.updateOne({ 'chatId': chatId }, { '$set': { 'pinnedStatMessageId': messageId } }, { 'upsert': true });
+
+            this._l.info(`Updated/Inserted group configuration. Result=${JSON.stringify(result.result)}`);
+        }
+        catch (error) {
+            this._l.error(`Error while performing setPinnedStat, error was:\n${error}}`)
+        }
+    }
+
     async changeRating(userId, value) {
         try {
             this._l.info(`addRating for user with id '${userId}' with value '${value}'`);
