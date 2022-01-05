@@ -1,8 +1,12 @@
 {
     "app": {
         "token": "<BOT TOKEN>",
-        "vote_timeout": 0,
-        "stat_timeout": 10800
+        "vote": {
+            "timeout": 0
+        },
+        "stat": {
+            "timeout": 18000
+        }
     },
     "logger": {
         "categories": {

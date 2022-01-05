@@ -80,21 +80,44 @@ module.exports = class App extends events.EventEmitter {
         });
     }
 
+    isPrivateMessage(message) {
+        return message && message.chat && message.chat.type === 'private';
+    }
+
+    isGroupMessage(message) {
+        return message && message.chat && message.chat.type === 'group' || message.chat.type === 'supergroup';
+    }
+
     // handlers
     async onMessage(message) {
         this._l.info(`Handle message (id=${message.message_id}; chat=${message.chat.id}; chat.type=${message.chat.type}; from=${message.from.id}); reply_to_message=${Boolean(message.reply_to_message)}; text=${Boolean(message.text)}`);
         
-        if (message.chat.type === 'private') {
+        this.incrementMessageStatistic(message);
+
+        if (this.isPrivateMessage(message)) {
             await this.handlePrivateMessage(message);
-        } else if (message.chat.type === 'group' || message.chat.type === 'supergroup') {
-            // Increment statistic only for groups
-            this._l.info(`Increment statistic`);
-            await this._mongo.incrementMessageStatistic(message.chat.id, message.from.id, message.date)
+        } else if (this.isGroupMessage(message)) {
             await this.handleGroupMessage(message);
         } else {
             this._l.info(`Skip message, unsupported type of chat`);
         }
 
+    }
+
+    async incrementMessageStatistic(message) {
+        this._l.info(`incrementMessageStatistic chatId=${message.chat.id} messageId=${message.message_id}`);
+        if (!this.isGroupMessage(message)) {
+            this._l.debug(`Don't increment statistic for non group`);
+            return;
+        }
+        // Don't handle my own messages
+        if (message.from.id == this._me.id) {
+            this._l.debug(`Don't increment statistic for my own messages`);
+            return;
+        }
+
+        this._l.debug(`Increment statistic`);
+        await this._mongo.incrementMessageStatistic(message.chat.id, message.from.id, message.date)
     }
 
     async handlePrivateMessage(message) {
@@ -129,7 +152,7 @@ module.exports = class App extends events.EventEmitter {
 
                 const ttl_key = `vote_limit:${message.from.id}:${message.chat.id}:${message.reply_to_message.from.id}`;
 
-                if (this._config.app.vote_timeout > 0) {
+                if (this._config.app.vote.timeout > 0) {
                     this._l.info(`Check TTL for ${ttl_key}`);
                     const ttl_value = await this._redis.ttl(ttl_key);
                     this._l.info(`TTL for ${ttl_value} is ${ttl_value}`);
@@ -148,9 +171,9 @@ module.exports = class App extends events.EventEmitter {
                     this._bot.sendMessage(message.chat.id, `Поздравляем '${message.reply_to_message.from.first_name}' - он преодолел отметку в 100 очков рейтинга! А чего добился ты?!`);
                 }
 
-                if (this._config.app.vote_timeout > 0) {
+                if (this._config.app.vote.timeout > 0) {
                     this._l.info(`Update TTL for ${ttl_key}`);
-                    this._redis.impl.set(ttl_key, 0, { EX: this._config.app.vote_timeout });
+                    this._redis.impl.set(ttl_key, 0, { EX: this._config.app.vote.timeout });
                 }
 
                 return;
@@ -292,11 +315,34 @@ module.exports = class App extends events.EventEmitter {
         response += `\n\nВсего сообщений: ${total}`;
 
         this._l.info(`Send message with statistic`);
-        await this._bot.sendMessage(message.chat.id, response, { parse_mode: 'HTML' });
+        const outgoing_message = await this._bot.sendMessage(message.chat.id, response, { parse_mode: 'HTML' });
 
-        if (this._config.app.stat_timeout > 0) {
-            this._l.info(`Set ${this._config.stat_timeout} ttl for /stat command`);
-            await this._redis.impl.set(ttl_key, 0, { EX: this._config.app.stat_timeout });
+        if (outgoing_message && outgoing_message.message_id) {
+
+            const old_message_id = await this._mongo.getPinnedStat(message.chat.id);
+            this._l.info(`Old pinned stat message is ${old_message_id}`);
+            if (old_message_id) {
+                this._l.info(`Unpin old message`);
+                // This bot API doesn't support message ID now.
+                this._bot.unpinChatMessage(message.chat.id, { message_id: old_message_id })
+                    .then(() => { this._l.info(`Message was unpinned`) })
+                    .catch(() => { this._l.error(`Failed to unpin message`) });
+            }
+
+            this._l.debug(`Pin message stat ${outgoing_message.message_id}`);
+
+            this._bot.pinChatMessage(message.chat.id, outgoing_message.message_id, { disable_notification: true })
+                .then(() => { this._l.info(`Message was pinned`) })
+                .catch(() => { this._l.error(`Failed to pin message`) });
+
+            this._mongo.setPinnedStat(message.chat.id, outgoing_message.message_id)
+                .then(() => { this._l.info(`pinnedStat was set`) })
+                .catch(() => { this._l.error(`Failed to set pinnedStat`) });
+        }
+
+        if (this._config.app.stat.timeout > 0) {
+            this._l.info(`Set ${this._config.app.stat.timeout} ttl for /stat command`);
+            await this._redis.impl.set(ttl_key, 0, { EX: this._config.app.stat.timeout });
         }
     }
 
