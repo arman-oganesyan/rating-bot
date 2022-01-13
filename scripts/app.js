@@ -443,4 +443,58 @@ module.exports = class App extends events.EventEmitter {
             await this._bot.sendMessage(message.chat.id, `Невозможно распознать число в вашем сообщении`, { reply_to_message_id: message.message_id});
         }
     }
+
+    async commandSetTimeOffset(message) {
+        const current_offset = await this._mongo.getTimeOffset(message.chat.id);
+        const reply = `Текущее значение ${current_offset} относительно UTC в часах. Пришли новое значение в ответ на это сообщение.`;
+
+        const bot_message = await this._bot.sendMessage(message.chat.id, reply, { reply_to_message_id: message.message_id, reply_markup: { force_reply: true, selective: true } });
+
+        const key = this.commandReplyKey(bot_message.message_id, message.from.id);
+        await this._redis.impl.set(key, 'commandSetTimeOffset', { EX: 120 });
+    }
+
+    async commandGetTimeOffset(message) {
+        await this._mongo.getTimeOffset(message.chat.id);
+    }
+
+    async isAnswerToCommand(message) {
+        if (message && message.text && message.reply_to_message) {
+
+            const key = this.commandReplyKey(message.reply_to_message.message_id, message.from.id);
+            const command = await this._redis.impl.get(key);
+
+            console.log(command);
+
+            return command;
+        }
+        
+    }
+
+    commandReplyKey(messageId, fromId) {
+        return `command:${messageId}:${fromId}`;
+    }
+
+    async handleAnswerCommandSetTimeOffset(message, commandKey) {
+        try {
+            this._l.info(`Delete command buffer from redis`);
+            await this._redis.impl.del(commandKey);
+
+            if (message.text.length > 3) {
+                await this._bot.sendMessage(message.chat.id, `Слишком много символов. Ошибка выполнения команды`);
+                return;
+            }
+
+            const offset = parseInt(message.text, 10);
+            if (offset && typeof offset === 'number') {
+                await this._mongo.setTimeOffset(message.chat.id, offset);
+                await this._bot.sendMessage(message.chat.id, `Часовой пояс установлен (${offset} часов относительно UTC)`);
+            } else {
+                await this._bot.sendMessage(message.chat.id, `Невозможно распознать число в вашем сообщении`, { reply_to_message_id: message.message_id});
+            }
+        }
+        catch (error) {
+            await this._bot.sendMessage(message.chat.id, `Невозможно распознать число в вашем сообщении`, { reply_to_message_id: message.message_id});
+        }
+    }
 }
