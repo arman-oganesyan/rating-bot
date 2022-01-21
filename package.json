@@ -20,7 +20,7 @@
   "dependencies": {
     "config": "^3.3.6",
     "escape-html": "^1.0.3",
-    "log4js": "^6.3.0",
+    "log4js": "^6.4.0",
     "mongodb": "^3.7.3",
     "node-telegram-bot-api": "^0.50.0",
     "redis": "^4.0.1"
