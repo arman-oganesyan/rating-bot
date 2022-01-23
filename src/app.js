@@ -7,7 +7,10 @@ const { RedisClient } = require('./redis');
 const escapeHtml = require('escape-html');
 
 const MessagesStatistic = require('./handlers/events/messages_statistic').MessagesStatistic;
+const ReactionHandler = require('./handlers/events/reaction').ReactionHandler;
+
 const HelpCommand = require('./handlers/commands/help').HelpCommand;
+const ShowCommand = require('./handlers/commands/show').ShowCommand;
 
 module.exports = class App extends events.EventEmitter {
 
@@ -18,10 +21,6 @@ module.exports = class App extends events.EventEmitter {
         this._l.info('create with config', config);
 
         this._config = config;
-        this._reactions = new Map([
-            ['+', 1], ['-', -1],
-            ['👍', 1], ['👎', -1]
-        ]);
 
         this._mongo = new Mongo(config.mongo);
 
@@ -32,7 +31,9 @@ module.exports = class App extends events.EventEmitter {
 
         this._handlers = [
             new MessagesStatistic(this),
-            new HelpCommand(this)
+            new ReactionHandler(this),
+            new HelpCommand(this),
+            new ShowCommand(this)
         ];
     }
 
@@ -67,13 +68,6 @@ module.exports = class App extends events.EventEmitter {
     }
 
     // private methods
-    _getReaction(text) {
-        const trimmed = text.trim();
-        for (const reaction of this._reactions) {
-            if (trimmed.startsWith(reaction[0]))
-                return reaction[1];
-        }
-    }
 
     _getMe() {
         return new Promise((resolve, reject) => {
@@ -126,54 +120,14 @@ module.exports = class App extends events.EventEmitter {
             return;
         }
         
-        if (message.text === '/show') {
-            await this.commandShow(message);
-        } else if (message.text === '/system') {
+        
+        if (message.text === '/system') {
             await this.commandSystem(message);
         }
     }
 
     async handleGroupMessage(message) {
 
-        if (message.reply_to_message && message.text) {
-
-            const reactionValue = this._getReaction(message.text);
-
-            if (reactionValue) {
-                if (message.from.id === message.reply_to_message.from.id) {
-                    this._bot.sendMessage(message.chat.id, 'Нельзя голосовать за себя');
-                    return;
-                }
-
-                const ttl_key = `vote_limit:${message.from.id}:${message.chat.id}:${message.reply_to_message.from.id}`;
-
-                if (this._config.app.vote.timeout > 0) {
-                    this._l.info(`Check TTL for ${ttl_key}`);
-                    const ttl_value = await this._redis.ttl(ttl_key);
-                    this._l.info(`TTL for ${ttl_value} is ${ttl_value}`);
-
-                    // don't vote too often
-                    if (ttl_value > 0) {
-                        this._bot.sendMessage(message.chat.id, `Нельзя так часто. Жди <b>${ttl_value}</b> сек.`, { parse_mode: 'HTML' });
-                        return;
-                    }
-                }
-
-                const rating = await this._mongo.changeRating(message.reply_to_message.from.id, reactionValue);
-                this._bot.sendMessage(message.chat.id, `Рейтинг '${message.reply_to_message.from.first_name}' ${rating.rating}`);
-
-                if (rating.achievment) {
-                    this._bot.sendMessage(message.chat.id, `Поздравляем '${message.reply_to_message.from.first_name}' - он преодолел отметку в 100 очков рейтинга! А чего добился ты?!`);
-                }
-
-                if (this._config.app.vote.timeout > 0) {
-                    this._l.info(`Update TTL for ${ttl_key}`);
-                    this._redis.impl.set(ttl_key, 0, { EX: this._config.app.vote.timeout });
-                }
-
-                return;
-            }
-        }
 
         if (message.entities) {
             const firstEntity = message.entities[0];
@@ -189,10 +143,7 @@ module.exports = class App extends events.EventEmitter {
 
                     const command = mention.substring(0, mention.length - lookup.length);
                     
-                    if (command === '/show') {
-                        return await this.commandShow(message);
-                    }
-                    else if (command === '/stat') {
+                    if (command === '/stat') {
                         return await this.commandStatAll(message);
                     }
                     else if (mention.startsWith('/system')) {
@@ -201,16 +152,6 @@ module.exports = class App extends events.EventEmitter {
                 }
             }
         }
-    }
-
-    async commandShow(message) {
-        this._l.info(`Handle command show in chat ${message.chat.id}`);
-
-        const show_me = message.reply_to_message === undefined;
-        const user_id = show_me ? message.from.id : message.reply_to_message.from.id;
-        const user_name = show_me ? message.from.first_name : message.reply_to_message.from.first_name;
-        const raiting = await this._mongo.getRaiting(user_id);
-        this._bot.sendMessage(message.chat.id, `Рейтинг '${user_name}' ${raiting}`);
     }
 
     async commandSystem(message) {

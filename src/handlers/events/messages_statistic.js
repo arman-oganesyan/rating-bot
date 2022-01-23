@@ -8,7 +8,7 @@ module.exports.MessagesStatistic = class MessagesStatistic extends BaseHandler {
     }
 
     canHandle(message) {
-        return message && this.__isGroupMessage(message);
+        return message && this._isGroupMessage(message);
     }
 
     async handle(message) {

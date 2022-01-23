@@ -6,7 +6,7 @@ module.exports.HelpCommand = class HelpCommand extends BaseHandler {
     }
 
     canHandle(message) {
-        return this.__isCommand(message, 'help');
+        return this._isCommand(message, 'help');
     }
 
     async handle(message) {
@@ -29,5 +29,7 @@ module.exports.HelpCommand = class HelpCommand extends BaseHandler {
         `;
 
         this._app._bot.sendMessage(message.chat.id, help, { parse_mode: "HTML" });
+
+        return true;
     }
 }

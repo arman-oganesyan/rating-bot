@@ -39,11 +39,15 @@ module.exports.BaseHandler = class BaseHandler extends events.EventEmitter {
         return message && message.chat && message.chat.type === 'private';
     }
 
-    __isGroupMessage(message) {
+    _isGroupMessage(message) {
         return message && message.chat && message.chat.type === 'group' || message.chat.type === 'supergroup';
     }
 
-    __isCommand(message, command) {
+    _isCommand(message, command) {
+        if (!message || !message.text) {
+            return false;
+        }
+
         if (message.text === `/${command}`) {
             return true;
         }
@@ -51,7 +55,7 @@ module.exports.BaseHandler = class BaseHandler extends events.EventEmitter {
         if (message.entities) {
             const firstEntity = message.entities[0];
             if (firstEntity.offset != 0) { // the message must starts with command
-                return;
+                return false;
             }
             
             if (firstEntity.type == 'bot_command') {
