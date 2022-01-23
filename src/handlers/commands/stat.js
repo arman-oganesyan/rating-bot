@@ -61,13 +61,14 @@ module.exports.StatCommand = class StatCommand extends BaseHandler {
 
             response += `\n\nВсего сообщений: ${total}`;
 
+            // Check for prev stat message. We need to reply to it and unpin if exists
+            const old_message_id = await this._app._mongo.getPinnedStat(message.chat.id);
+            this._l.info(`Old pinned stat message is ${old_message_id}`);
+
             this._l.info(`Send message with statistic`);
-            const outgoing_message = await this._app._bot.sendMessage(message.chat.id, response, { parse_mode: 'HTML' });
+            const outgoing_message = await this._app._bot.sendMessage(message.chat.id, response, { parse_mode: 'HTML', reply_to_message_id: old_message_id });
 
             if (outgoing_message && outgoing_message.message_id) {
-
-                const old_message_id = await this._app._mongo.getPinnedStat(message.chat.id);
-                this._l.info(`Old pinned stat message is ${old_message_id}`);
                 if (old_message_id) {
                     this._l.info(`Unpin old message`);
                     // This bot API doesn't support message ID now.
