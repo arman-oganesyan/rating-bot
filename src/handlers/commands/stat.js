@@ -36,6 +36,11 @@ module.exports.StatCommand = class StatCommand extends BaseHandler {
                 this._l.info(`Get chat member chat=${message.chat.id} member=${key}`);
                 const chatMember = await this._app._bot.getChatMember(message.chat.id, key);
                 this._l.debug(`Member received ${JSON.stringify(chatMember)}`);
+                
+                if (chatMember.user.is_bot) {
+                    this._l.debug(`Skip this user as it's a bot`);
+                    continue;
+                }
 
                 let mention_user = chatMember.user.username;
                 if (!mention_user) {
