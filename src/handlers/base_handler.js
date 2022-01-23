@@ -14,7 +14,7 @@ module.exports.BaseHandler = class BaseHandler extends events.EventEmitter {
     }
     /**
      * 
-     * @param {*} message - Telegram message
+     * @param {*} message Telegram message
      * @returns True if this handler can handle message, otherwise false
      */
     canHandle(message) {
@@ -23,7 +23,7 @@ module.exports.BaseHandler = class BaseHandler extends events.EventEmitter {
 
     /**
      * 
-     * @param {*} message - Telegram message 
+     * @param {*} message Telegram message 
      * @returns True if handling was finished and there is no need to keep on proceeding,
      *          otherwise false that means continue with other handlers as well.
      * 
@@ -33,19 +33,40 @@ module.exports.BaseHandler = class BaseHandler extends events.EventEmitter {
         return false;
     }
 
-    // private
+    /**
+     * 
+     * @param {*} message Telegram message
+     * @returns Return true if message in chat with bot, otherwise false
+     */
     _isPrivateMessage(message) {
         return message && message.chat && message.chat.type === 'private';
     }
 
+    /**
+     * 
+     * @param {*} message Telegram message
+     * @returns Return true if message in a group chat, otherwise false
+     */
     _isGroupMessage(message) {
         return message && message.chat && message.chat.type === 'group' || message.chat.type === 'supergroup';
     }
 
+    /**
+     * 
+     * @param {*} message Telegram message
+     * @param {*} command Name of command
+     * @returns Returns true if a message is a command (either private or group), otherwise false
+     */
     _isCommand(message, command) {
         return this._isPrivateCommand(message, command) || this._isGroupCommand(message, command);
     }
 
+    /**
+     * 
+     * @param {*} message Telegram message
+     * @param {*} command Name of command
+     * @returns Returns true if a message is a command in chat with bot, otherwise false
+     */
     _isPrivateCommand(message, command) {
         if (!this._isPrivateMessage(message) || !message.text) {
             return false;
@@ -54,6 +75,12 @@ module.exports.BaseHandler = class BaseHandler extends events.EventEmitter {
         return message.text.startsWith(`/${command}`);
     }
 
+    /**
+     * 
+     * @param {*} message Telegram message
+     * @param {*} command Name of command
+     * @returns Returns true if a message is a command in a group chat (command+bot mention), otherwise false
+     */
     _isGroupCommand(message, command) {
         if (!this._isGroupMessage(message) || !message.text || !message.entities) {
             return false;
