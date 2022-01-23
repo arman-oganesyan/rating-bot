@@ -56,7 +56,7 @@ module.exports.ReactionHandler = class Reaction extends BaseHandler {
             }
 
         } catch (err) {
-
+            this._l.error('Failed to handle! Error was: ', err);
         }
 
         return false;

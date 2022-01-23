@@ -23,6 +23,7 @@ module.exports.MessagesStatistic = class MessagesStatistic extends BaseHandler {
             await this._app._mongo.incrementMessageStatistic(message.chat.id, message.from.id, message.date)
         }
         catch (err) {
+            this._l.error('Failed to handle! Error was: ', err);
         }
 
         // Other handlers can also process this message if they can

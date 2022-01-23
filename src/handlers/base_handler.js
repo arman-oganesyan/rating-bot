@@ -34,8 +34,7 @@ module.exports.BaseHandler = class BaseHandler extends events.EventEmitter {
     }
 
     // private
-
-    __isPrivateMessage(message) {
+    _isPrivateMessage(message) {
         return message && message.chat && message.chat.type === 'private';
     }
 
@@ -44,29 +43,35 @@ module.exports.BaseHandler = class BaseHandler extends events.EventEmitter {
     }
 
     _isCommand(message, command) {
-        if (!message || !message.text) {
+        return this._isPrivateCommand(message, command) || this._isGroupCommand(message, command);
+    }
+
+    _isPrivateCommand(message, command) {
+        if (!this._isPrivateMessage(message) || !message.text) {
             return false;
         }
 
-        if (message.text === `/${command}`) {
-            return true;
+        return message.text.startsWith(`/${command}`);
+    }
+
+    _isGroupCommand(message, command) {
+        if (!this._isGroupMessage(message) || !message.text || !message.entities) {
+            return false;
         }
 
-        if (message.entities) {
-            const firstEntity = message.entities[0];
-            if (firstEntity.offset != 0) { // the message must starts with command
-                return false;
-            }
-            
-            if (firstEntity.type == 'bot_command') {
-                const mention = message.text.substring(firstEntity.offset, firstEntity.offset + firstEntity.length);
-                const lookup = '@' + this._app._me.username;
+        const firstEntity = message.entities[0];
+        if (firstEntity.offset != 0) { // the message must starts with command
+            return false;
+        }
+        
+        if (firstEntity.type == 'bot_command') {
+            const mention = message.text.substring(firstEntity.offset, firstEntity.offset + firstEntity.length);
+            const lookup = '@' + this._app._me.username;
 
-                if (mention.endsWith(lookup)) { // make sure user mentioned this bot
-                    const user_command = mention.substring(0, mention.length - lookup.length);
-                    
-                    return user_command === `/${command}`;
-                }
+            if (mention.endsWith(lookup)) { // make sure user mentioned this bot
+                const user_command = mention.substring(0, mention.length - lookup.length);
+                
+                return user_command === `/${command}`;
             }
         }
 

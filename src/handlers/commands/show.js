@@ -20,7 +20,7 @@ module.exports.ShowCommand = class ShowCommand extends BaseHandler {
             this._app._bot.sendMessage(message.chat.id, `Рейтинг '${user_name}' ${raiting}`);
         }
         catch(err) {
-
+            this._l.error('Failed to handle! Error was: ', err);
         }
 
         return true;

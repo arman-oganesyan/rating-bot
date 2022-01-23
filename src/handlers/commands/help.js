@@ -10,9 +10,11 @@ module.exports.HelpCommand = class HelpCommand extends BaseHandler {
     }
 
     async handle(message) {
-        this._l.info(`Handle command help in chat ${message.chat.id}`);
 
-        const help = `<b>Для чего нужен этот бот?</b>
+        try {
+            this._l.info(`Handle command help in chat ${message.chat.id}`);
+
+            const help = `<b>Для чего нужен этот бот?</b>
 
 Бот предназначен для групп. Он позволяет вам ставить лайки и дизлайки на чужие сообщения, а также ведет статистику по сообщениям в группе, а именно: кто и сколько сообщений написал. Эту статистику можно будет просмотреть за день, месяц или вообще за всё время.
 
@@ -28,7 +30,11 @@ module.exports.HelpCommand = class HelpCommand extends BaseHandler {
 /show - показывает ваш рейтинг. Чтобы узнать рейтинг другого пользователя отправьте команду в ответ на его сообщение
         `;
 
-        this._app._bot.sendMessage(message.chat.id, help, { parse_mode: "HTML" });
+            this._app._bot.sendMessage(message.chat.id, help, { parse_mode: "HTML" });
+        }
+        catch (err) {
+            this._l.error('Failed to handle! Error was: ', err);
+        }
 
         return true;
     }
