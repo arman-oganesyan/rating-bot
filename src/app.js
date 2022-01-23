@@ -6,6 +6,9 @@ const { networkInterfaces } = require('os');
 const { RedisClient } = require('./redis');
 const escapeHtml = require('escape-html');
 
+const MessagesStatistic = require('./handlers/events/messages_statistic').MessagesStatistic;
+const HelpCommand = require('./handlers/commands/help').HelpCommand;
+
 module.exports = class App extends events.EventEmitter {
 
     constructor(config) {
@@ -26,6 +29,11 @@ module.exports = class App extends events.EventEmitter {
 
         this._bot = new tg(this._config.app.token, this._config.tg);
         this._bot.on('message', (message) => this.onMessage(message));
+
+        this._handlers = [
+            new MessagesStatistic(this),
+            new HelpCommand(this)
+        ];
     }
 
     async start() {
@@ -92,7 +100,13 @@ module.exports = class App extends events.EventEmitter {
     async onMessage(message) {
         this._l.info(`Handle message (id=${message.message_id}; chat=${message.chat.id}; chat.type=${message.chat.type}; from=${message.from.id}); reply_to_message=${Boolean(message.reply_to_message)}; text=${Boolean(message.text)}`);
         
-        this.incrementMessageStatistic(message);
+        for (const handler of this._handlers) {
+            if (handler.canHandle(message)) {
+                if (await handler.handle(message)) {
+                    break;
+                }
+            }
+        }
 
         if (this.isPrivateMessage(message)) {
             await this.handlePrivateMessage(message);
@@ -104,22 +118,6 @@ module.exports = class App extends events.EventEmitter {
 
     }
 
-    async incrementMessageStatistic(message) {
-        this._l.info(`incrementMessageStatistic chatId=${message.chat.id} messageId=${message.message_id}`);
-        if (!this.isGroupMessage(message)) {
-            this._l.debug(`Don't increment statistic for non group`);
-            return;
-        }
-        // Don't handle my own messages
-        if (message.from.id == this._me.id) {
-            this._l.debug(`Don't increment statistic for my own messages`);
-            return;
-        }
-
-        this._l.debug(`Increment statistic`);
-        await this._mongo.incrementMessageStatistic(message.chat.id, message.from.id, message.date)
-    }
-
     async handlePrivateMessage(message) {
         this._l.info(`Handle private message (id=${message.message_id})`);
 
@@ -127,11 +125,8 @@ module.exports = class App extends events.EventEmitter {
             this._l.info(`Message won't be proceed, it doesn't have text`);
             return;
         }
-
-        if (message.text === '/help') {
-            await this.commandHelp(message);
-        }
-        else if (message.text === '/show') {
+        
+        if (message.text === '/show') {
             await this.commandShow(message);
         } else if (message.text === '/system') {
             await this.commandSystem(message);
@@ -193,11 +188,8 @@ module.exports = class App extends events.EventEmitter {
                 if (mention.endsWith(lookup)) { // be sure that the command is for this bot
 
                     const command = mention.substring(0, mention.length - lookup.length);
-
-                    if (command === '/help') {
-                        return await this.commandHelp(message);
-                    }
-                    else if (command === '/show') {
+                    
+                    if (command === '/show') {
                         return await this.commandShow(message);
                     }
                     else if (command === '/stat') {
@@ -209,29 +201,6 @@ module.exports = class App extends events.EventEmitter {
                 }
             }
         }
-    }
-
-    async commandHelp(message) {
-        this._l.info(`Handle command help in chat ${message.chat.id}`);
-
-        const help =`<b>Для чего нужен этот бот?</b>
-
-Бот предназначен для групп. Он позволяет вам ставить лайки и дизлайки на чужие сообщения, а также ведет статистику по сообщениям в группе, а именно: кто и сколько сообщений написал. Эту статистику можно будет просмотреть за день, месяц или вообще за всё время.
-
-<b>Как пользоваться?</b>
-
-Просто отвечайте на чужие сообщения. Если ваше сообщение начинается с '+' или '👍' - к рейтингу пользователя будет добавлено одно очко, а если с '-' или '👎' - то рейтинг пользователя будет уменьшен на одно очко.
-
-Вы можете проголосовать за одного и того же пользователя не чаще, чем раз в 60 секунд.
-
-<b>Доступные команды</b>
-
-/help - вывод этой справки
-/show - показывает ваш рейтинг. Чтобы узнать рейтинг другого пользователя отправьте команду в ответ на его сообщение
-        `;
-
-        this._bot.sendMessage(message.chat.id, help, { parse_mode: "HTML" });
-
     }
 
     async commandShow(message) {
