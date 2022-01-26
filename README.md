@@ -1,5 +1,5 @@
 # What is it?
-Rating Bot for Telegram messenger. Add this bot to your group and it will analyze all the messages. It will update the rating of user if someone reacted to it with the one of the following symbols: `+`, `👍`, `-`, `👎`. Stickers are comming soon! Big refactoring as well.
+Rating Bot for Telegram messenger. Add this bot to your group and it will analyze all the messages. It will update the rating of user if someone reacted to it with the one of the following symbols: `+`, `👍`, `-`, `👎` or with a sticker with an appropriate associated emoji.
 
 After being added to a group this bot starts to track how many messages are sent by each user. Than this statistic can be easily be received using `/stat` command. You can use `/help` command to get more information.
 
