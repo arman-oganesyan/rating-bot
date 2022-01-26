@@ -13,12 +13,12 @@ module.exports.ReactionHandler = class Reaction extends BaseHandler {
     }
 
     canHandle(message) {
-        return this._isGroupMessage(message) && message.reply_to_message && message.text;
+        return this._isGroupMessage(message) && message.reply_to_message && (message.text || message.sticker);
     }
 
     async handle(message) {
         try {
-            const reactionValue = this._getReaction(message.text);
+            const reactionValue = this._getReaction(message.text ?? message.sticker.emoji);
             if (!reactionValue) {
                 return false;
             }
