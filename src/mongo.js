@@ -58,12 +58,42 @@ module.exports.Mongo = class Mongo extends EventEmitter {
             this._l.info(`setPinnedStat for chatId=${chatId} and messageId=${messageId}`);
 
             const group_settings = this._rating.collection('group_settings');
-            const result = await group_settings.updateOne({ 'chatId': chatId }, { '$set': { 'pinnedStatMessageId': messageId } }, { 'upsert': true });
+            const result = await group_settings.updateOne({ 'chatId': chatId }, { '$set': { pinnedStatMessageId: messageId } }, { 'upsert': true });
 
             this._l.info(`Updated/Inserted group configuration. Result=${JSON.stringify(result.result)}`);
         }
         catch (error) {
             this._l.error(`Error while performing setPinnedStat, error was:\n${error}}`)
+        }
+    }
+
+    async getGroupSetting(chatId, field) {
+        try {
+            this._l.info(`setGroupSetting for chatId=${chatId} and field=${field}`);
+            
+            const group_settings = this._rating.collection('group_settings');
+            const result = await group_settings.findOne({ 'chatId': chatId });
+
+            this._l.info(`Group settings=${JSON.stringify(result)}`);
+            
+            return result ? result[field] : undefined;
+        }
+        catch (err) {
+            this._l.error(`Error while performing getGroupSetting, error was:\n${JSON.stringify(error)}`)
+        }
+    }
+
+    async setGroupSetting(chatId, object) {
+        try {
+            this._l.info(`setGroupSetting for chatId=${chatId} and object=${JSON.stringify(object)}`);
+
+            const group_settings = this._rating.collection('group_settings');
+            const result = await group_settings.updateOne({ 'chatId': chatId }, { '$set': object }, { 'upsert': true });
+
+            this._l.info(`Updated/Inserted group setting. Result=${JSON.stringify(result.result)}`);
+        }
+        catch (error) {
+            this._l.error(`Error while performing setGroupSetting, error was:\n${error}}`)
         }
     }
 

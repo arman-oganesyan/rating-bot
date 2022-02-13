@@ -28,6 +28,8 @@ module.exports.StatCommand = class StatCommand extends BaseHandler {
             let stat = await this._app._mongo.getChatStat(message.chat.id);
             stat = new Map([...stat.entries()].sort((a, b) => b[1] - a[1]));
 
+            const old_stat = await this._app._mongo.getGroupSetting(message.chat.id, "prev_stat") ?? {};
+
             let response = '<b>Статистика за всё время</b>\n';
             let total = 0;
             let index = 1;
@@ -54,12 +56,27 @@ module.exports.StatCommand = class StatCommand extends BaseHandler {
                     mention_user = '@' + mention_user;
                 }
 
+                let dynamic = '';
+                if (old_stat && old_stat.hasOwnProperty(key)) {
+                    const delta = value - old_stat[key];
+                    if (delta > 0) {
+                        dynamic += ` (+${delta})`;
+                    }
+                }
 
-                response += `\n${index}. ${mention_user}: <i>${value}</i> ${this._indexEmoji(index++)}`
+                response += `\n${index}. ${mention_user}: <i>${value}</i>${dynamic} ${this._indexEmoji(index++)}`;
                 total += value;
             }
+            stat.set('total', total);
+            this._app._mongo.setGroupSetting(message.chat.id, { "prev_stat": Object.fromEntries(stat) });
 
             response += `\n\nВсего сообщений: ${total}`;
+            if (old_stat.hasOwnProperty('total')) {
+                const delta = total - old_stat['total'];
+                if (delta > 0) {
+                    response += ` (+${delta})`;
+                }
+            }
 
             // Check for prev stat message. We need to reply to it and unpin if exists
             const old_message_id = await this._app._mongo.getPinnedStat(message.chat.id);
