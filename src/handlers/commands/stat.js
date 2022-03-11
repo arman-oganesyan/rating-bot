@@ -35,9 +35,16 @@ module.exports.StatCommand = class StatCommand extends BaseHandler {
             let index = 1;
 
             for (const [key, value] of stat) {
-                this._l.info(`Get chat member chat=${message.chat.id} member=${key}`);
-                const chatMember = await this._app._bot.getChatMember(message.chat.id, key);
-                this._l.debug(`Member received ${JSON.stringify(chatMember)}`);
+                let chatMember;
+                try {
+                    this._l.info(`Get chat member chat=${message.chat.id} member=${key}`);
+                    chatMember = await this._app._bot.getChatMember(message.chat.id, key);
+                    this._l.debug(`Member received ${JSON.stringify(chatMember)}`);
+                }
+                catch(err) {
+                    this._l.error(`Failed to get info for ${key}! Error was: `, err);
+                    continue;
+                }
                 
                 if (chatMember.user.is_bot) {
                     this._l.debug(`Skip this user as it's a bot`);
