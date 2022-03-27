@@ -154,9 +154,9 @@ module.exports.Mongo = class Mongo extends EventEmitter {
         }
     }
 
-    async incrementMessageStatistic(chatId, userId, timestamp) {
+    async incrementMessageStatistic(chatId, userId, timestamp, message_length) {
         try {
-            this._l.info(`incrementMessageStatistic in chat ${chatId} for user ${userId} at ${timestamp}`);
+            this._l.info(`incrementMessageStatistic in chat ${chatId} for user ${userId} at ${timestamp} with length ${message_length}`);
 
             if (!chatId || !userId)
                 return;
@@ -168,10 +168,11 @@ module.exports.Mongo = class Mongo extends EventEmitter {
             this._l.debug(`Retrived userStat ${JSON.stringify(userStat)}`);
 
             if (userStat) {
-                await statCollection.updateOne({_id: userStat._id}, { '$inc': { 'messagesCnt': 1 } });
+                await statCollection.updateOne({_id: userStat._id}, { '$inc': { 'messagesCnt': 1, 'messagesLength': message_length } });
             }
             else {
                 lookup_key.messagesCnt = 1;
+                lookup_key.messagesLength = message_length;
                 await statCollection.insertOne(lookup_key);
             }
         }

@@ -19,8 +19,10 @@ module.exports.MessagesStatistic = class MessagesStatistic extends BaseHandler {
                 return;
             }
 
-            this._l.debug(`Increment statistic`);
-            await this._app._mongo.incrementMessageStatistic(message.chat.id, message.from.id, message.date)
+            const message_length = (!message.forward_date && message.text) ? message.text.length : 0;
+
+            this._l.debug(`Increment statistic with length ${message_length}`);
+            await this._app._mongo.incrementMessageStatistic(message.chat.id, message.from.id, message.date, message_length)
         }
         catch (err) {
             this._l.error('Failed to handle! Error was: ', err);
