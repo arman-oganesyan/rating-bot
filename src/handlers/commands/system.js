@@ -1,9 +1,9 @@
-const BaseHandler = require('./../base_handler').BaseHandler;
+const BaseCommand = require('./base_command').BaseCommand;
 const { networkInterfaces } = require('os');
 
-module.exports.SystemCommand = class SystemCommand extends BaseHandler {
+module.exports.SystemCommand = class SystemCommand extends BaseCommand {
     constructor(app) {
-        super('command.system', app);
+        super('system', app);
     }
 
     canHandle(message) {

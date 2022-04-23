@@ -1,8 +1,8 @@
-const BaseHandler = require('./../base_handler').BaseHandler;
+const BaseCommand = require('./base_command').BaseCommand;
 
-module.exports.ShowCommand = class ShowCommand extends BaseHandler {
+module.exports.ShowCommand = class ShowCommand extends BaseCommand {
     constructor(app) {
-        super('command.show', app);
+        super('show', app);
     }
 
     canHandle(message) {

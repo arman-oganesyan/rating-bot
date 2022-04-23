@@ -29,10 +29,12 @@ module.exports = class App extends events.EventEmitter {
         this._bot = new tg(this._config.app.token, this._config.tg);
         this._bot.on('message', (message) => this.onMessage(message));
 
-        this._handlers = [
+        this._events = [
             new MessagesStatistic(this),
-            new ReactionHandler(this),
+            new ReactionHandler(this)
+        ];
 
+        this._commands = [
             new HelpCommand(this),
             new ShowCommand(this),
             new StatCommand(this),
@@ -89,7 +91,13 @@ module.exports = class App extends events.EventEmitter {
     async onMessage(message) {
         this._l.info(`Handle message (id=${message.message_id}; chat=${message.chat.id}; chat.type=${message.chat.type}; from=${message.from.id}); reply_to_message=${Boolean(message.reply_to_message)}; text=${Boolean(message.text)}`);
         
-        for (const handler of this._handlers) {
+        for (const event of this._events){
+            if (event.canHandle(message)) {
+                await event.handle(message);
+            }
+        }
+
+        for (const handler of this._commands) {
             if (handler.canHandle(message)) {
                 if (await handler.handle(message)) {
                     break;

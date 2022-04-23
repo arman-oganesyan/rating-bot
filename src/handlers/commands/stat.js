@@ -1,10 +1,10 @@
-const BaseHandler = require('./../base_handler').BaseHandler;
+const BaseCommand = require('./base_command').BaseCommand;
 
 const escapeHtml = require('escape-html');
 
-module.exports.StatCommand = class StatCommand extends BaseHandler {
+module.exports.StatCommand = class StatCommand extends BaseCommand {
     constructor(app) {
-        super('command.stat', app);
+        super('stat', app);
     }
 
     canHandle(message) {
@@ -111,7 +111,6 @@ module.exports.StatCommand = class StatCommand extends BaseHandler {
                     .then(() => { this._l.info(`pinnedStat was set`) })
                     .catch(() => { this._l.error(`Failed to set pinnedStat`) });
             }
-
 
             if (this._app._config.app.stat.timeout > 0) {
                 this._l.info(`Set ${this._app._config.app.stat.timeout} ttl for /stat command`);
