@@ -91,15 +91,36 @@ module.exports = class App extends events.EventEmitter {
     async onMessage(message) {
         this._l.info(`Handle message (id=${message.message_id}; chat=${message.chat.id}; chat.type=${message.chat.type}; from=${message.from.id}); reply_to_message=${Boolean(message.reply_to_message)}; text=${Boolean(message.text)}`);
         
+        // All the events should be handled
         for (const event of this._events){
             if (event.canHandle(message)) {
                 await event.handle(message);
             }
         }
 
+        // Handle appropriate command
+        var handled = false;
         for (const handler of this._commands) {
             if (handler.canHandle(message)) {
-                if (await handler.handle(message)) {
+                await handler.handle(message);
+                handled = true;
+                break;
+            }
+        }
+
+        // If command wasn't handled and this is a reply
+        // It's possibly a reply to a command
+        if (!handled && message.reply_to_message) {
+            for (const handler of this._commands) {
+                const command_state = await handler.isReplyToCommand(
+                    message.chat.id,
+                    message.reply_to_message.message_id,
+                    message.from.id
+                    );
+
+                if (command_state) {
+                    // TODO: call handler here
+                    handled = true;
                     break;
                 }
             }

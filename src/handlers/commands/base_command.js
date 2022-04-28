@@ -5,17 +5,22 @@ module.exports.BaseCommand = class BaseCommand extends BaseHandler {
         super(`command.${command_name}`, app);
     }
 
-    async _markReplyToCommand(chat_id, message_id, state) {
+    _replyKey(chat_id, message_id, user_id) {
+        return `${this._name}:${chat_id}:wait:${message_id}:${user_id}`;
+    }
+
+    async _markReplyToCommand(chat_id, message_id, user_id, state) {
         const reply = {
             'message_id': message_id,
             'state': state
         };
 
-        return await this._app._redis.impl.set(`${this._name}:wait:${chat_id}`, JSON.stringify(reply), { EX: 120 });
+        return await this._app._redis.impl.set(this._replyKey(chat_id, message_id, user_id),
+            JSON.stringify(reply), { EX: 120 });
     }
 
-    async _isReplyToCommand(chat_id, message_id) {
-        return await this._app._redis.impl.get(`${this._name}:wait:${chat_id}`);
+    async isReplyToCommand(chat_id, message_id, user_id) {
+        return await this._app._redis.impl.get(this._replyKey(chat_id, message_id, user_id));
     }
 
     /**
