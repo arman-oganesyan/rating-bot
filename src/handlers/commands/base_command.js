@@ -16,7 +16,7 @@ module.exports.BaseCommand = class BaseCommand extends BaseHandler {
         };
 
         return await this._app._redis.impl.set(this._replyKey(chat_id, message_id, user_id),
-            JSON.stringify(reply), { EX: 120 });
+            JSON.stringify(reply), { EX: this._app._config.app.command_reply_timeout });
     }
 
     async isReplyToCommand(chat_id, message_id, user_id) {
