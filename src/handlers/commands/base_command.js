@@ -3,6 +3,8 @@ const BaseHandler = require('./../base_handler').BaseHandler;
 module.exports.BaseCommand = class BaseCommand extends BaseHandler {
     constructor(command_name, app) {
         super(`command.${command_name}`, app);
+        this._states = {};
+        this._states['state_init'] = this.stateInit;
     }
 
     _replyKey(chat_id, message_id, user_id) {
@@ -11,7 +13,9 @@ module.exports.BaseCommand = class BaseCommand extends BaseHandler {
 
     async _markReplyToCommand(chat_id, message_id, user_id, state) {
         const reply = {
+            'chat_id': chat_id,
             'message_id': message_id,
+            'user_id': user_id,
             'state': state
         };
 
@@ -19,8 +23,41 @@ module.exports.BaseCommand = class BaseCommand extends BaseHandler {
             JSON.stringify(reply), { EX: this._app._config.app.command_reply_timeout });
     }
 
+    async _clearReplyToCommand(command_state) {
+        return await this._app._redis.impl.del(this._replyKey(command_state.chat_id,
+            command_state.message_id, command_state.user_id));
+    }
+
     async isReplyToCommand(chat_id, message_id, user_id) {
         return await this._app._redis.impl.get(this._replyKey(chat_id, message_id, user_id));
+    }
+
+    async handle(message) {
+        try {
+            return await this.stateInit(message);
+        }
+        catch (err) {
+            this._l.error('Failed to handle! Error was: ', err);
+        }
+
+        return false;
+    }
+
+    async stateInit(message) {
+        return false;
+    }
+
+    async loadCommand(message, command_state) {
+        try {
+            if (command_state.state in this._states) {
+                return this._states[command_state.state].call(this, message, command_state);
+            }
+        }
+        catch (err) {
+            this._l.error('Failed to loadCommand! Error was: ', err);
+        }
+
+        return false;
     }
 
     /**

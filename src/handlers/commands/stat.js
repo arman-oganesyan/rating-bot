@@ -11,7 +11,7 @@ module.exports.StatCommand = class StatCommand extends BaseCommand {
         return this._isGroupCommand(message, 'stat');
     }
 
-    async handle(message) {
+    async stateInit(message) {
         try {
             this._l.info(`commandStatAll for chat ${message.chat.id} from user ${message.from.id}`);
             const ttl_key = `command_ttl:stat:${message.chat.id}`;

@@ -10,7 +10,7 @@ module.exports.SystemCommand = class SystemCommand extends BaseCommand {
         return this._isPrivateCommand(message, 'system');
     }
 
-    async handle(message) {
+    async stateInit(message) {
         try {
             const nets = networkInterfaces();
             const results = Object.create(null); // Or just '{}', an empty object

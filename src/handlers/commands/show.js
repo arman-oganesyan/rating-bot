@@ -9,7 +9,7 @@ module.exports.ShowCommand = class ShowCommand extends BaseCommand {
         return this._isCommand(message, 'show');
     }
 
-    async handle(message) {
+    async stateInit(message) {
         try {
             this._l.info(`Handle command show in chat ${message.chat.id}`);
 

@@ -121,7 +121,7 @@ module.exports = class App extends events.EventEmitter {
                 );
 
                 if (command_state) {
-                    // TODO: call handler here
+                    handler.loadCommand(message, JSON.parse(command_state));
                     handled_command = true;
                     break;
                 }
