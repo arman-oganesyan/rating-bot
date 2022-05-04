@@ -11,6 +11,7 @@ const HelpCommand = require('./handlers/commands/help').HelpCommand;
 const ShowCommand = require('./handlers/commands/show').ShowCommand;
 const StatCommand = require('./handlers/commands/stat').StatCommand;
 const SystemCommand = require('./handlers/commands/system').SystemCommand;
+const SettingsCommand = require('./handlers/commands/settings').SettingsCommand;
 
 module.exports = class App extends events.EventEmitter {
 
@@ -28,6 +29,7 @@ module.exports = class App extends events.EventEmitter {
 
         this._bot = new tg(this._config.app.token, this._config.tg);
         this._bot.on('message', (message) => this.onMessage(message));
+        this._bot.on('callback_query', (query) => this.onCallbackQuery(query));
 
         this._events = [
             new MessagesStatistic(this),
@@ -38,7 +40,8 @@ module.exports = class App extends events.EventEmitter {
             new HelpCommand(this),
             new ShowCommand(this),
             new StatCommand(this),
-            new SystemCommand(this)
+            new SystemCommand(this),
+            new SettingsCommand(this)
         ];
     }
 
@@ -121,10 +124,22 @@ module.exports = class App extends events.EventEmitter {
                 );
 
                 if (command_state) {
-                    handler.loadCommand(message, JSON.parse(command_state));
+                    await handler.loadCommand(message, JSON.parse(command_state));
                     handled_command = true;
                     break;
                 }
+            }
+        }
+    }
+
+    async onCallbackQuery(query) {
+        this._l.info(`Callback query (id=${query.id} message_id=${query.message.message_id}; chat=${query.message.chat.id}; chat.type=${query.message.chat.type}; from=${query.from.id});`);
+        this._bot.answerCallbackQuery(query.id);
+        for (const handler of this._commands) {
+            const command_state = await handler.isReplyToCommand(query.message.chat.id, query.message.message_id, query.from.id);
+            if (command_state) {
+                await handler.loadQuery(query, JSON.parse(command_state));
+                break;
             }
         }
     }

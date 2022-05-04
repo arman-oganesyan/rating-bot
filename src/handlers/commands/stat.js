@@ -1,7 +1,5 @@
 const BaseCommand = require('./base_command').BaseCommand;
 
-const escapeHtml = require('escape-html');
-
 module.exports.StatCommand = class StatCommand extends BaseCommand {
     constructor(app) {
         super('stat', app);
@@ -13,7 +11,7 @@ module.exports.StatCommand = class StatCommand extends BaseCommand {
 
     async stateInit(message) {
         try {
-            this._l.info(`commandStatAll for chat ${message.chat.id} from user ${message.from.id}`);
+            this._l.info(`stateInit for chat ${message.chat.id} from user ${message.from.id}`);
             const ttl_key = `command_ttl:stat:${message.chat.id}`;
 
             this._l.info(`Check ttl for command`);
@@ -51,18 +49,7 @@ module.exports.StatCommand = class StatCommand extends BaseCommand {
                     continue;
                 }
 
-                let mention_user = chatMember.user.username;
-                if (!mention_user) {
-                    let display_name = '';
-                    if (chatMember.user.last_name) {
-                        display_name += chatMember.user.last_name + ' ';
-                    }
-                    display_name += chatMember.user.first_name;
-                    mention_user = `<a href="tg://user?id=${key}">${escapeHtml(display_name)}</a>`;
-                } else {
-                    mention_user = '@' + mention_user;
-                }
-
+                let mention_user = this._mentionFromChatMember(chatMember);
                 let dynamic = '';
                 if (old_stat && old_stat.hasOwnProperty(key)) {
                     const delta = value - old_stat[key];
