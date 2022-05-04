@@ -1,15 +1,15 @@
-const BaseHandler = require('./../base_handler').BaseHandler;
+const BaseCommand = require('./base_command').BaseCommand;
 
-module.exports.ShowCommand = class ShowCommand extends BaseHandler {
+module.exports.ShowCommand = class ShowCommand extends BaseCommand {
     constructor(app) {
-        super('command.show', app);
+        super('show', app);
     }
 
     canHandle(message) {
         return this._isCommand(message, 'show');
     }
 
-    async handle(message) {
+    async stateInit(message) {
         try {
             this._l.info(`Handle command show in chat ${message.chat.id}`);
 

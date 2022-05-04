@@ -1,17 +1,17 @@
-const BaseHandler = require('./../base_handler').BaseHandler;
+const BaseCommand = require('./base_command').BaseCommand;
 
 const escapeHtml = require('escape-html');
 
-module.exports.StatCommand = class StatCommand extends BaseHandler {
+module.exports.StatCommand = class StatCommand extends BaseCommand {
     constructor(app) {
-        super('command.stat', app);
+        super('stat', app);
     }
 
     canHandle(message) {
         return this._isGroupCommand(message, 'stat');
     }
 
-    async handle(message) {
+    async stateInit(message) {
         try {
             this._l.info(`commandStatAll for chat ${message.chat.id} from user ${message.from.id}`);
             const ttl_key = `command_ttl:stat:${message.chat.id}`;
@@ -41,11 +41,11 @@ module.exports.StatCommand = class StatCommand extends BaseHandler {
                     chatMember = await this._app._bot.getChatMember(message.chat.id, key);
                     this._l.debug(`Member received ${JSON.stringify(chatMember)}`);
                 }
-                catch(err) {
+                catch (err) {
                     this._l.error(`Failed to get info for ${key}! Error was: `, err);
                     continue;
                 }
-                
+
                 if (chatMember.user.is_bot) {
                     this._l.debug(`Skip this user as it's a bot`);
                     continue;
@@ -111,7 +111,6 @@ module.exports.StatCommand = class StatCommand extends BaseHandler {
                     .then(() => { this._l.info(`pinnedStat was set`) })
                     .catch(() => { this._l.error(`Failed to set pinnedStat`) });
             }
-
 
             if (this._app._config.app.stat.timeout > 0) {
                 this._l.info(`Set ${this._app._config.app.stat.timeout} ttl for /stat command`);

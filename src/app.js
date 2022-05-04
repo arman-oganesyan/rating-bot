@@ -29,10 +29,12 @@ module.exports = class App extends events.EventEmitter {
         this._bot = new tg(this._config.app.token, this._config.tg);
         this._bot.on('message', (message) => this.onMessage(message));
 
-        this._handlers = [
+        this._events = [
             new MessagesStatistic(this),
-            new ReactionHandler(this),
+            new ReactionHandler(this)
+        ];
 
+        this._commands = [
             new HelpCommand(this),
             new ShowCommand(this),
             new StatCommand(this),
@@ -88,10 +90,39 @@ module.exports = class App extends events.EventEmitter {
     // handlers
     async onMessage(message) {
         this._l.info(`Handle message (id=${message.message_id}; chat=${message.chat.id}; chat.type=${message.chat.type}; from=${message.from.id}); reply_to_message=${Boolean(message.reply_to_message)}; text=${Boolean(message.text)}`);
-        
-        for (const handler of this._handlers) {
+
+        // All the events should be handled
+        var handled_event = false;
+        for (const event of this._events) {
+            if (event.canHandle(message)) {
+                handled_event = true;
+                await event.handle(message);
+            }
+        }
+
+        // Handle appropriate command
+        var handled_command = false;
+        for (const handler of this._commands) {
             if (handler.canHandle(message)) {
-                if (await handler.handle(message)) {
+                await handler.handle(message);
+                handled_command = true;
+                break;
+            }
+        }
+
+        // If command wasn't handled and this is a reply
+        // It's possibly a reply to a command
+        if (!handled_command && message.reply_to_message) {
+            for (const handler of this._commands) {
+                const command_state = await handler.isReplyToCommand(
+                    message.chat.id,
+                    message.reply_to_message.message_id,
+                    message.from.id
+                );
+
+                if (command_state) {
+                    handler.loadCommand(message, JSON.parse(command_state));
+                    handled_command = true;
                     break;
                 }
             }

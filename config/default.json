@@ -1,6 +1,7 @@
 {
     "app": {
         "token": "<BOT TOKEN>",
+        "command_reply_timeout": 120,
         "vote": {
             "timeout": 0
         },
