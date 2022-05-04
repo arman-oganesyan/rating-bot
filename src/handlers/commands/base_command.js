@@ -1,4 +1,5 @@
 const BaseHandler = require('./../base_handler').BaseHandler;
+const escapeHtml = require('escape-html');
 
 module.exports.BaseCommand = class BaseCommand extends BaseHandler {
     constructor(command_name, app) {
@@ -60,6 +61,19 @@ module.exports.BaseCommand = class BaseCommand extends BaseHandler {
         return false;
     }
 
+    async loadQuery(query, command_state) {
+        try {
+            if (query.data in this._states) {
+                return this._states[query.data].call(this, query, command_state);
+            }
+        }
+        catch (err) {
+            this._l.error('Failed to loadQuery! Error was: ', err);
+        }
+
+        return false;
+    }
+
     /**
      * 
      * @param {*} message Telegram message
@@ -112,5 +126,38 @@ module.exports.BaseCommand = class BaseCommand extends BaseHandler {
         }
 
         return false;
+    }
+
+    _getChatMember(chat_id, user_id) {
+        return this._app._bot.getChatMember(chat_id, user_id);
+    }
+
+    _isCreator(chat_member) {
+        return chat_member && chat_member.status && chat_member.status === 'creator';
+    }
+
+    _verifyCreator(chat_id, chat_member, send_reply) {
+        if (!this._isCreator(chat_member)) {
+            if (send_reply === true) {
+                this._app._bot.sendMessage(chat_id, `Команда доступна только создателю группы`);
+            }
+            return false;
+        }
+        return true;
+    }
+
+    _mentionFromChatMember(chatMember) {
+        let mention_user = chatMember.user.username;
+        if (!mention_user) {
+            let display_name = '';
+            if (chatMember.user.last_name) {
+                display_name += chatMember.user.last_name + ' ';
+            }
+            display_name += chatMember.user.first_name;
+            mention_user = `<a href="tg://user?id=${chatMember.user.id}">${escapeHtml(display_name)}</a>`;
+        } else {
+            mention_user = '@' + mention_user;
+        }
+        return mention_user;
     }
 }
